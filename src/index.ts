@@ -1,6 +1,8 @@
 import * as BABYLON from 'babylonjs';
 import * as BABYLONGUI from 'babylonjs-gui';
 import _ from "lodash";
+import * as util from "./util";
+import MyWorker from "./my.worker.ts";
 
 
 export function testLodash(): void {
@@ -13,6 +15,13 @@ export function testLodash(): void {
     const result = _.filter(strs, (val) => val == "test");
     console.log(result);
 }
+
+
+type SceneContainer = {
+    scene?: BABYLON.Scene;
+    serialized: string;
+}
+const container: SceneContainer = { serialized: "" }
 
 
 export function testBabylon(): void {
@@ -46,6 +55,8 @@ export function testBabylon(): void {
         engine.resize();
     });
 
+    container.scene = scene;
+
     // UI
     const createButton = (
         text: string,
@@ -65,13 +76,38 @@ export function testBabylon(): void {
     const advancedTexture = BABYLONGUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
     const panel = new BABYLONGUI.StackPanel();    
     advancedTexture.addControl(panel);
-    panel.addControl(createButton("Click Me 1", () => {
-        alert("press click me first");
-    }))
-    panel.addControl(createButton("Click Me 2", () => {
-        alert("press click me second");
+    panel.addControl(createButton("clear scene", () => {
+        scene.meshes.forEach(mesh => scene.removeMesh(mesh));
     }));
-    panel.addControl(createButton("Click Me 3", () => {
-        alert("press click me third");
+    panel.addControl(createButton("serialize scene", () => {
+        container.serialized = JSON.stringify(BABYLON.SceneSerializer.Serialize(scene));
+        console.log(container.serialized);
+        alert("done to serialize");
+    }));
+    panel.addControl(createButton("deserialize scene", () => {
+        if (!container.serialized) {
+            alert("you must serialize the scene firstly");
+            return;
+        }
+        BABYLON.SceneLoader.Append("", "data: " + container.serialized, scene, () => {
+            alert("done to deserialize");
+        });
+    }));
+
+
+    const worker = new MyWorker();
+    worker.addEventListener("message", (event) => {
+        if (!("result" in event.data) || typeof event.data.result !== "string") {
+            console.error("invalid result data");
+            return;
+        }
+        scene.meshes.forEach(mesh => scene.removeMesh(mesh));
+        BABYLON.SceneLoader.Append("", "data: " + event.data.result, scene, () => {
+            alert("done to receive scene from the worker");
+        });
+    });
+    panel.addControl(createButton("post to worker", () => {
+        worker.postMessage({ serialized: util.serializeScene(scene) });
+        alert("done to post the worker scene");
     }));
 }

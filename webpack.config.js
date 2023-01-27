@@ -26,6 +26,7 @@ module.exports = {
     ],
     module: {
         rules: [
+            { test: /\.worker\.ts$/, loader: "worker-loader" },
             { test: /\.tsx?$/, loader: 'ts-loader', exclude: /node_modules/ },
         ]
     },
